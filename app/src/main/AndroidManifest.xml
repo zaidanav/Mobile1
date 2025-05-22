@@ -1,13 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools" >
-
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
 
     <application
         android:name=".PurrytifyApp"
@@ -30,22 +24,5 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <activity
-            android:name=".QueueScreenActivity"
-            android:exported="false"
-            android:theme="@style/Theme.Purrytify" />
-
-        <service
-            android:name=".service.TokenRefreshService"
-            android:enabled="true"
-            android:exported="false" />
-
-
-        <!-- Make sure you also have the MediaPlayerService registered -->
-        <service
-            android:name=".service.MediaPlayerService"
-            android:enabled="true"
-            android:exported="false" />
     </application>
 </manifest>

@@ -21,51 +21,18 @@ class TokenManager(context: Context) {
 
     companion object {
         private const val KEY_JWT_TOKEN = "jwt_token"
-        private const val KEY_REFRESH_TOKEN = "refresh_token"
-        private const val KEY_TOKEN_EXPIRY = "token_expiry"
-        private const val KEY_USER_ID = "user_id"
-        private const val EXPIRY_TIME = 300000 // 5 minutes in milliseconds
+    }
+
+    fun saveToken(token: String) {
+        sharedPreferences.edit { putString(KEY_JWT_TOKEN, token) }
     }
 
     fun getToken(): String? {
         return sharedPreferences.getString(KEY_JWT_TOKEN, null)
     }
 
-    fun getRefreshToken(): String? {
-        return sharedPreferences.getString(KEY_REFRESH_TOKEN, null)
-    }
-
-    fun isTokenExpiring(): Boolean {
-        // Check if the token is expiring in the next 30 seconds
-        val expiryTime = sharedPreferences.getLong(KEY_TOKEN_EXPIRY, 0)
-        return System.currentTimeMillis() + 30000 > expiryTime
-    }
-
-    fun saveTokens(accessToken: String, refreshToken: String) {
-        sharedPreferences.edit {
-            putString(KEY_JWT_TOKEN, accessToken)
-            putString(KEY_REFRESH_TOKEN, refreshToken)
-            putLong(KEY_TOKEN_EXPIRY, System.currentTimeMillis() + EXPIRY_TIME)
-        }
-    }
-
-    fun saveUserId(userId: Int) {
-        sharedPreferences.edit {
-            putInt(KEY_USER_ID, userId)
-        }
-    }
-
-    fun getUserId(): Int {
-        return sharedPreferences.getInt(KEY_USER_ID, -1)
-    }
-
-    fun deleteTokens() {
-        sharedPreferences.edit {
-            remove(KEY_JWT_TOKEN)
-            remove(KEY_REFRESH_TOKEN)
-            remove(KEY_TOKEN_EXPIRY)
-            remove(KEY_USER_ID)
-        }
+    fun deleteToken() {
+        sharedPreferences.edit { remove(KEY_JWT_TOKEN) }
     }
 
     fun isLoggedIn(): Boolean {

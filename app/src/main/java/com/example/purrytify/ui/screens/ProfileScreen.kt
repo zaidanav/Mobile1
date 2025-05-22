@@ -1,13 +1,9 @@
 package com.example.purrytify.ui.screens
 
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,7 +12,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
@@ -29,37 +24,21 @@ import com.example.purrytify.MainActivity
 import com.example.purrytify.R
 import com.example.purrytify.models.UserProfile
 import com.example.purrytify.ui.theme.BACKGROUND_COLOR
-import com.example.purrytify.ui.theme.GREEN_COLOR
 import com.example.purrytify.viewmodels.ProfileViewModel
 import com.example.purrytify.viewmodels.ViewModelFactory
-import com.google.accompanist.swiperefresh.SwipeRefresh
-import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     profileViewModel: ProfileViewModel = viewModel(
-        factory = ViewModelFactory.getInstance(LocalContext.current)
+        factory = ViewModelFactory(LocalContext.current)
     )
 ) {
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-    val context = LocalContext.current
 
     // State untuk menyimpan data
     var userProfile by remember { mutableStateOf<UserProfile?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
-
-    // Stats
-    val totalSongs by profileViewModel.totalSongs.collectAsState()
-    val likedSongs by profileViewModel.likedSongs.collectAsState()
-    val listenedSongs by profileViewModel.listenedSongs.collectAsState()
-
-    // For pull-to-refresh functionality
-    val refreshState = rememberSwipeRefreshState(isLoading)
-
-    // Scroll state
-    val scrollState = rememberScrollState()
 
     // Observe LiveData dari ViewModel
     DisposableEffect(lifecycleOwner) {
@@ -71,7 +50,6 @@ fun ProfileScreen(
         // Observer untuk loading state
         val loadingObserver = androidx.lifecycle.Observer<Boolean> { loading ->
             isLoading = loading
-            refreshState.isRefreshing = loading
         }
 
         // Observer untuk error message
@@ -95,111 +73,44 @@ fun ProfileScreen(
         }
     }
 
-    SwipeRefresh(
-        state = refreshState,
-        onRefresh = { profileViewModel.refreshData() }
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(BACKGROUND_COLOR)
-                .verticalScroll(scrollState)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Header with refresh button
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Profile",
-                    color = Color.White,
-                    fontFamily = FontFamily(Font(R.font.poppins_semi_bold)),
-                    fontSize = 24.sp
-                )
-
-                IconButton(onClick = { profileViewModel.refreshData() }) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Refresh Profile",
-                        tint = Color.White
-                    )
-                }
-            }
-
-            if (isLoading && userProfile == null) {
-                // Show loading indicator only on initial load
-                CircularProgressIndicator(
-                    modifier = Modifier.padding(16.dp),
-                    color = GREEN_COLOR
-                )
-            } else if (error != null && userProfile == null) {
-                // Show error message
-                ErrorContent(error = error!!, onRetry = { profileViewModel.loadUserProfile() })
-            } else if (userProfile != null) {
-                // Show profile information
-                ProfileContent(
-                    userProfile = userProfile!!,
-                    totalSongs = totalSongs,
-                    likedSongs = likedSongs,
-                    listenedSongs = listenedSongs,
-                    onLogout = {
-                        (context as? MainActivity)?.logout()
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun ErrorContent(error: String, onRetry: () -> Unit) {
     Column(
         modifier = Modifier
-            .fillMaxWidth()
+            .fillMaxSize()
+            .background(BACKGROUND_COLOR)
             .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(
-            painter = painterResource(id = R.drawable.ic_error),
-            contentDescription = "Error",
-            tint = Color.Red,
-            modifier = Modifier.size(64.dp)
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
         Text(
-            text = "Error: $error",
-            color = Color.Red,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(16.dp)
+            text = "Profile",
+            color = Color.White,
+            fontFamily = FontFamily(Font(R.font.poppins_semi_bold)),
+            fontSize = 24.sp,
+            modifier = Modifier.padding(vertical = 16.dp)
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(
-            onClick = onRetry,
-            colors = ButtonDefaults.buttonColors(containerColor = GREEN_COLOR)
-        ) {
-            Text("Retry")
+        if (isLoading) {
+            // Show loading indicator
+            CircularProgressIndicator(
+                modifier = Modifier.padding(16.dp),
+                color = Color.White
+            )
+        } else if (error != null) {
+            // Show error message
+            Text(
+                text = "Error: $error",
+                color = Color.Red,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(16.dp)
+            )
+        } else if (userProfile != null) {
+            // Show profile information
+            ProfileContent(userProfile = userProfile!!, viewModel = profileViewModel)
         }
     }
 }
 
 @Composable
-fun ProfileContent(
-    userProfile: UserProfile,
-    totalSongs: Int,
-    likedSongs: Int,
-    listenedSongs: Int,
-    onLogout: () -> Unit
-) {
+fun ProfileContent(userProfile: UserProfile, viewModel: ProfileViewModel) {
     val context = LocalContext.current
 
     Column(
@@ -209,25 +120,19 @@ fun ProfileContent(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Profile Photo
-        Box(
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data("http://34.101.226.132:3000/uploads/profile-picture/${userProfile.profilePhoto}")
+                .crossfade(true)
+                .build(),
+            contentDescription = "Profile Photo",
             modifier = Modifier
                 .size(120.dp)
                 .clip(CircleShape)
-                .background(Color.Gray),
-            contentAlignment = Alignment.Center
-        ) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data("http://34.101.226.132:3000/uploads/profile-picture/${userProfile.profilePhoto}")
-                    .crossfade(true)
-                    .build(),
-                contentDescription = "Profile Photo",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-                error = painterResource(id = R.drawable.ic_person_placeholder),
-                fallback = painterResource(id = R.drawable.ic_person_placeholder)
-            )
-        }
+                .background(Color.Gray), // Gunakan background sebagai placeholder
+            contentScale = ContentScale.Crop
+            // Hapus placeholder dan error image
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -259,50 +164,32 @@ fun ProfileContent(
             fontSize = 16.sp
         )
 
-        // Joined date
-        Text(
-            text = "Joined: ${formatDate(userProfile.createdAt)}",
-            color = Color.Gray,
-            fontFamily = FontFamily(Font(R.font.poppins_regular)),
-            fontSize = 14.sp
-        )
-
         Spacer(modifier = Modifier.height(32.dp))
 
         // Stats section
-        Card(
+        Text(
+            text = "Your Music Stats",
+            color = Color.White,
+            fontFamily = FontFamily(Font(R.font.poppins_semi_bold)),
+            fontSize = 18.sp,
+            modifier = Modifier.align(Alignment.Start)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Stats cards in a row
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = Color(0xFF1E1E1E)
-            ),
-            shape = RoundedCornerShape(12.dp)
+            horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
-            ) {
-                Text(
-                    text = "Your Music Stats",
-                    color = Color.White,
-                    fontFamily = FontFamily(Font(R.font.poppins_semi_bold)),
-                    fontSize = 18.sp,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
+            // Added Songs
+            StatCard(count = "0", label = "Added")
 
-                // Stats cards in a row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    // Added Songs
-                    StatCard(count = totalSongs.toString(), label = "Added")
+            // Liked Songs
+            StatCard(count = "0", label = "Liked")
 
-                    // Liked Songs
-                    StatCard(count = likedSongs.toString(), label = "Liked")
-
-                    // Listened Songs
-                    StatCard(count = listenedSongs.toString(), label = "Listened")
-                }
-            }
+            // Listened Songs
+            StatCard(count = "0", label = "Listened")
         }
 
         // Spacer to push the logout button to the bottom
@@ -310,7 +197,10 @@ fun ProfileContent(
 
         // Logout Button
         Button(
-            onClick = onLogout,
+            onClick = {
+                viewModel.logout()
+                (context as? MainActivity)?.recreate()
+            },
             colors = ButtonDefaults.buttonColors(
                 containerColor = Color.Red,
                 contentColor = Color.White
@@ -324,42 +214,22 @@ fun ProfileContent(
 
 @Composable
 fun StatCard(count: String, label: String) {
-    Box(
-        modifier = Modifier
-            .size(width = 90.dp, height = 90.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF282828)),
-        contentAlignment = Alignment.Center
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = count,
-                color = GREEN_COLOR,
-                fontFamily = FontFamily(Font(R.font.poppins_semi_bold)),
-                fontSize = 24.sp
-            )
+        Text(
+            text = count,
+            color = Color.White,
+            fontFamily = FontFamily(Font(R.font.poppins_semi_bold)),
+            fontSize = 24.sp
+        )
 
-            Text(
-                text = label,
-                color = Color.White,
-                fontFamily = FontFamily(Font(R.font.poppins_regular)),
-                fontSize = 14.sp
-            )
-        }
-    }
-}
-
-// Helper function to format date string
-private fun formatDate(dateString: String): String {
-    // You can implement proper date formatting logic here
-    // For now, just return a simplified version
-    return try {
-        val parts = dateString.split("T")
-        parts[0]  // Just return the date part
-    } catch (e: Exception) {
-        dateString
+        Text(
+            text = label,
+            color = Color.White,
+            fontFamily = FontFamily(Font(R.font.poppins_regular)),
+            fontSize = 14.sp
+        )
     }
 }

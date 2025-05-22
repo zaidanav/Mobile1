@@ -2,13 +2,12 @@ package com.example.purrytify.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -17,6 +16,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material3.Text
+
 
 @Composable
 fun LibraryTabs(
@@ -24,49 +25,41 @@ fun LibraryTabs(
     onTabSelected: (String) -> Unit
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        // All Songs Tab
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .clip(RoundedCornerShape(20.dp))
-                .background(
-                    if (selectedTab == "All") Color(0xFF1DB954) else Color(0xFF333333)
-                )
-                .clickable { onTabSelected("All") }
-                .padding(vertical = 10.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "All Songs",
-                color = Color.White,
-                fontSize = 14.sp,
-                fontWeight = if (selectedTab == "All") FontWeight.Bold else FontWeight.Normal
-            )
-        }
+        TabItem(
+            text = "All",
+            isSelected = selectedTab == "All",
+            onSelected = { onTabSelected("All") }
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        TabItem(
+            text = "Liked",
+            isSelected = selectedTab == "Liked",
+            onSelected = { onTabSelected("Liked") }
+        )
+    }
+}
 
-        // Liked Songs Tab
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .clip(RoundedCornerShape(20.dp))
-                .background(
-                    if (selectedTab == "Liked") Color(0xFF1DB954) else Color(0xFF333333)
-                )
-                .clickable { onTabSelected("Liked") }
-                .padding(vertical = 10.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "Liked Songs",
-                color = Color.White,
-                fontSize = 14.sp,
-                fontWeight = if (selectedTab == "Liked") FontWeight.Bold else FontWeight.Normal
-            )
-        }
+@Composable
+fun TabItem(
+    text: String,
+    isSelected: Boolean,
+    onSelected: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(if (isSelected) Color(0xFF1DB954) else Color.DarkGray.copy(alpha = 0.5f))
+            .clickable { onSelected() }
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = Color.White,
+            fontSize = 14.sp,
+            fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal
+        )
     }
 }

@@ -28,10 +28,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material.icons.filled.Pause
-import androidx.compose.ui.platform.LocalContext
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
-import com.example.purrytify.R
 
 
 @Composable
@@ -51,31 +47,15 @@ fun MiniPlayer(
                 .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Album Art - using simple Image with placeholder
-            // Note: For better image loading, use the SongCoverImage component
-            if (currentSong.coverUrl.isNotEmpty()) {
-                // Ideal: Use Coil or Glide untuk loading image dari file path
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(currentSong.coverUrl)
-                        .crossfade(true)
-                        .build(),
-                    contentDescription = "${currentSong.title} album art",
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(4.dp)),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_image_placeholder),
-                    contentDescription = "${currentSong.title} album art",
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(4.dp)),
-                    contentScale = ContentScale.Crop
-                )
-            }
+            // Album Art
+            Image(
+                painter = painterResource(id = currentSong.albumArt),
+                contentDescription = "${currentSong.title} album art",
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                contentScale = ContentScale.Crop
+            )
 
             // Song Info
             Column(
