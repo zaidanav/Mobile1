@@ -12,6 +12,7 @@ import com.example.purrytify.ui.screens.OnlineSongsScreen
 import com.example.purrytify.ui.screens.ProfileScreen
 import com.example.purrytify.ui.screens.QueueScreen
 import com.example.purrytify.util.NetworkConnectionObserver
+import com.example.purrytify.util.toSong
 import com.example.purrytify.viewmodels.MainViewModel
 
 object Destinations {
@@ -51,9 +52,11 @@ fun AppNavigation(
         }
         composable(Destinations.ONLINE_SONGS_ROUTE) {
             OnlineSongsScreen(
-                onSongSelected = { song ->
-                    // Play the online song
-                    mainViewModel.playOnlineSong(song)
+                onSongSelected = { onlineSong ->
+                    // PERBAIKAN: Convert OnlineSong to Song using extension function
+                    val song = onlineSong.toSong()
+                    // Use unified playSong method
+                    mainViewModel.playSong(song)
                 }
             )
         }

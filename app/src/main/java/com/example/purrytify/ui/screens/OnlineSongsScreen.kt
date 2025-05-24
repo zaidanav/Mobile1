@@ -28,6 +28,7 @@ import com.example.purrytify.ui.theme.BACKGROUND_COLOR
 import com.example.purrytify.ui.theme.GREEN_COLOR
 import com.example.purrytify.util.NetworkUtils
 import com.example.purrytify.util.SongDownloadManager
+import com.example.purrytify.util.toSong
 import com.example.purrytify.viewmodels.OnlineSongsViewModel
 import com.example.purrytify.viewmodels.OnlineSongsViewModelFactory
 import kotlinx.coroutines.launch
@@ -183,7 +184,10 @@ fun OnlineSongsScreen(
                                     isDownloading = isDownloading,
                                     showRank = true,
                                     rank = index + 1,
-                                    onSongClick = onSongSelected,
+                                    onSongClick = { clickedSong ->
+                                        // PERBAIKAN: Convert OnlineSong to Song and use callback
+                                        onSongSelected(clickedSong)
+                                    },
                                     onDownloadClick = { clickedSong ->
                                         if (!isDownloaded && !isDownloading) {
                                             // Start download
@@ -244,7 +248,10 @@ fun OnlineSongsScreen(
                                     isDownloading = isDownloading,
                                     showRank = true,
                                     rank = index + 1,
-                                    onSongClick = onSongSelected,
+                                    onSongClick = { clickedSong ->
+                                        // PERBAIKAN: Convert OnlineSong to Song and use callback
+                                        onSongSelected(clickedSong)
+                                    },
                                     onDownloadClick = { clickedSong ->
                                         if (!isDownloaded && !isDownloading) {
                                             // Start download

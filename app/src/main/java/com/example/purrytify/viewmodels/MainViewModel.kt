@@ -182,13 +182,14 @@ class MainViewModel(private val songRepository: SongRepository) : ViewModel() {
         }
     }
 
+    // PERBAIKAN: Unified playSong method for both online and offline songs
     fun playSong(song: Song) {
-        Log.d(TAG, "Playing song: ${song.title}")
+        Log.d(TAG, "Playing song: ${song.title}, isOnline: ${song.isOnline}")
 
         // Reset history when manually selecting a song
         _playHistory.value = emptyList()
 
-        // Play the song using media player service
+        // PERBAIKAN: Always use the unified playSong method
         mediaPlayerService?.playSong(song)
 
         // Update current song state
@@ -196,14 +197,18 @@ class MainViewModel(private val songRepository: SongRepository) : ViewModel() {
         _isPlaying.value = true
 
         viewModelScope.launch {
-            // Ubah cara penanganan queue
-            // Buat queue baru yang hanya berisi lagu ini
+            // Update queue
             _queue.value = listOf(song)
             _currentQueueIndex.value = 0
 
-            // Update song's last played timestamp
-            Log.d(TAG, "Updating last played timestamp for song ${song.id}")
-            songRepository.updateLastPlayed(song.id)
+            // PERBAIKAN: Only update last played for offline songs
+            // Online songs don't need to update database timestamp
+            if (!song.isOnline && song.id > 0) {
+                Log.d(TAG, "Updating last played timestamp for offline song ${song.id}")
+                songRepository.updateLastPlayed(song.id)
+            } else {
+                Log.d(TAG, "Skipping last played update for online song: ${song.title}")
+            }
         }
     }
 
@@ -471,29 +476,6 @@ class MainViewModel(private val songRepository: SongRepository) : ViewModel() {
             } ?: run {
                 Log.d(TAG, "No song found in all songs at index $nextIndex")
                 stopCurrentPlayback()
-            }
-        }
-    }
-
-    // Di MainViewModel.kt
-    fun playOnlineSong(onlineSong: OnlineSong) {
-        viewModelScope.launch {
-            Log.d(TAG, "Playing online song: ${onlineSong.title}")
-
-            try {
-                if (mediaPlayerService != null) {
-                    // Play using service - gunakan coverUrl bukan artworkPath
-                    mediaPlayerService?.playOnlineSong(
-                        audioUrl = onlineSong.audioUrl,
-                        title = onlineSong.title,
-                        artist = onlineSong.artist,
-                        coverUrl = onlineSong.artworkUrl // Gunakan parameter yang benar
-                    )
-                } else {
-                    Log.e(TAG, "MediaPlayerService is not available")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error playing online song", e)
             }
         }
     }

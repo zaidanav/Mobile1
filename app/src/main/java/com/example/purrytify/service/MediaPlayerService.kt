@@ -58,9 +58,6 @@ class MediaPlayerService : Service() {
         localBroadcastManager = LocalBroadcastManager.getInstance(this)
 
         // Set up completion listener
-        // In MediaPlayerService.kt, update the media player completion listener
-
-// Set up completion listener
         mediaPlayer.setOnCompletionListener {
             Log.d(TAG, "Song completed playback")
             _isPlaying.value = false
@@ -99,47 +96,56 @@ class MediaPlayerService : Service() {
         }
     }
 
-    // Dalam MediaPlayerService.kt
-    fun playOnlineSong(
-        audioUrl: String,
-        title: String,
-        artist: String,
-        coverUrl: String = "" // Gunakan coverUrl, bukan artworkPath
-    ) {
+    // PERBAIKAN: Unified song playing method
+    fun playSong(song: Song) {
         try {
-            Log.d(TAG, "Playing online song: $title - $artist, URL: $audioUrl")
+            Log.d(TAG, "Playing song: ${song.title}, isOnline: ${song.isOnline}, path: ${song.filePath}")
+
+            // PERBAIKAN: Reset state regardless of song type
+            resetPlaybackState()
+
+            // PERBAIKAN: Always update current song first
+            _currentSong.value = song
+            _currentPlayingId.value = song.id
 
             // Reset media player
             mediaPlayer.reset()
 
-            // Set data source
+            if (song.isOnline && song.filePath.startsWith("http")) {
+                // Online song - use URL directly
+                Log.d(TAG, "Playing online song from URL: ${song.filePath}")
+                playFromUrl(song.filePath, song)
+            } else {
+                // Offline song - use local file path
+                Log.d(TAG, "Playing offline song from file: ${song.filePath}")
+                playFromFile(song.filePath, song)
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error playing song: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+
+    // PERBAIKAN: Separate method for URL playback
+    private fun playFromUrl(audioUrl: String, song: Song) {
+        try {
+            // Set data source for URL
             mediaPlayer.setDataSource(audioUrl)
 
-            // Prepare asynchronously
+            // Prepare asynchronously for network streams
             mediaPlayer.prepareAsync()
 
             // Set listener for when prepared
-            mediaPlayer.setOnPreparedListener {
+            mediaPlayer.setOnPreparedListener { mp ->
                 // Start playback
-                it.start()
+                mp.start()
 
-                // Create song model with proper fields
-                val song = Song(
-                    id = -1, // Temporary ID for online song
-                    title = title,
-                    artist = artist,
-                    coverUrl = coverUrl, // Use coverUrl parameter
-                    filePath = audioUrl,
-                    duration = it.duration.toLong(),
-                    isPlaying = true,
-                    isLiked = false,
-                    isOnline = true,
-                    lastPlayed = System.currentTimeMillis()
-                )
-
-                _currentSong.value = song
+                // Update states
                 _isPlaying.value = true
-                _duration.value = it.duration
+                _duration.value = mp.duration
+
+                Log.d(TAG, "Online song prepared and started: ${song.title}")
 
                 // Start tracking position
                 startPositionTracking()
@@ -150,22 +156,13 @@ class MediaPlayerService : Service() {
         }
     }
 
-    fun playSong(song: Song) {
+    // PERBAIKAN: Separate method for file playback
+    private fun playFromFile(filePath: String, song: Song) {
         try {
-            Log.d(TAG, "Playing song: ${song.title}, path: ${song.filePath}")
-            // Reset end of playback flag when starting a new song
-            _reachedEndOfPlayback.value = false
-
-            // Reset media player if currently playing another song
-            mediaPlayer.reset()
-
-            // Save the current song ID to track playback and prevent infinite loops
-            _currentPlayingId.value = song.id
-
             // Check if path is content URI or local file path
-            if (song.filePath.startsWith("content://")) {
+            if (filePath.startsWith("content://")) {
                 // Use ContentResolver for content URI
-                val uri = Uri.parse(song.filePath)
+                val uri = Uri.parse(filePath)
                 val contentResolver = applicationContext.contentResolver
                 val afd = contentResolver.openFileDescriptor(uri, "r")
 
@@ -173,45 +170,67 @@ class MediaPlayerService : Service() {
                     mediaPlayer.setDataSource(afd.fileDescriptor)
                     afd.close()
                 } else {
-                    throw IOException("Cannot open file descriptor for URI: ${song.filePath}")
+                    throw IOException("Cannot open file descriptor for URI: $filePath")
                 }
             } else {
                 // Regular local file
-                mediaPlayer.setDataSource(song.filePath)
+                mediaPlayer.setDataSource(filePath)
             }
 
-            // Prepare and play
+            // Prepare and play synchronously for local files
             mediaPlayer.prepare()
             mediaPlayer.start()
 
-            // Update state
-            _currentSong.value = song
+            // Update states
             _isPlaying.value = true
             _duration.value = mediaPlayer.duration
-            Log.d(TAG, "Song duration: ${mediaPlayer.duration}ms")
+
+            Log.d(TAG, "Offline song prepared and started: ${song.title}, duration: ${mediaPlayer.duration}ms")
 
             // Start position tracking
             startPositionTracking()
 
         } catch (e: IOException) {
-            Log.e(TAG, "Error playing song: ${e.message}")
+            Log.e(TAG, "Error playing offline song: ${e.message}")
         } catch (e: Exception) {
-            Log.e(TAG, "Unexpected error: ${e.message}")
+            Log.e(TAG, "Unexpected error playing offline song: ${e.message}")
             e.printStackTrace()
         }
     }
 
-    // Play the current song again (for repeat one)
-    private fun playAgain() {
-        try {
-            mediaPlayer.seekTo(0)
-            mediaPlayer.start()
-            _isPlaying.value = true
-            startPositionTracking()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error replaying song: ${e.message}")
-        }
+    // PERBAIKAN: Reset all playback state
+    private fun resetPlaybackState() {
+        _reachedEndOfPlayback.value = false
+        _isPlaying.value = false
+        _currentPosition.value = 0
+        _duration.value = 0
     }
+
+    // DEPRECATED: Remove this method to avoid confusion
+    // Use playSong() instead for both online and offline songs
+    /*
+    fun playOnlineSong(
+        audioUrl: String,
+        title: String,
+        artist: String,
+        coverUrl: String = ""
+    ) {
+        // This method is now deprecated
+        // Convert to Song object and use playSong()
+        val song = Song(
+            id = -1,
+            title = title,
+            artist = artist,
+            coverUrl = coverUrl,
+            filePath = audioUrl,
+            duration = 0,
+            isPlaying = true,
+            isLiked = false,
+            isOnline = true
+        )
+        playSong(song)
+    }
+    */
 
     fun togglePlayPause() {
         if (mediaPlayer.isPlaying) {
@@ -273,6 +292,18 @@ class MediaPlayerService : Service() {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping playback: ${e.message}")
+        }
+    }
+
+    // Play the current song again (for repeat one)
+    private fun playAgain() {
+        try {
+            mediaPlayer.seekTo(0)
+            mediaPlayer.start()
+            _isPlaying.value = true
+            startPositionTracking()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error replaying song: ${e.message}")
         }
     }
 

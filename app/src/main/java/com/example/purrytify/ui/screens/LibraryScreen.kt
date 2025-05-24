@@ -203,7 +203,10 @@ fun LibraryScreen(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(top = 8.dp)
+                    .padding(top = 8.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                    bottom = if (currentSong != null) 80.dp else 16.dp // PERBAIKAN: Gunakan contentPadding
+                )
             ) {
                 // Display filtered songs
                 if (filteredSongs.isEmpty()) {
@@ -229,11 +232,10 @@ fun LibraryScreen(
                         SongItem(
                             song = song.copy(isPlaying = currentSong?.id == song.id && isPlaying),
                             onSongClick = { clickedSong ->
-                                // Ganti dengan implementasi yang benar
-                                libraryViewModel.playSong(clickedSong)
-                                onSongSelected(clickedSong)
-                                // Panggil mainViewModel.playSong dengan parameter clearQueue = true
+                                // PERBAIKAN: Hanya panggil mainViewModel.playSong
+                                // Hapus panggilan ke libraryViewModel.playSong untuk menghindari konflik
                                 mainViewModel.playSong(clickedSong)
+                                onSongSelected(clickedSong)
                             },
                             onAddToQueue = { queuedSong ->
                                 mainViewModel.addToQueue(queuedSong)
@@ -257,10 +259,8 @@ fun LibraryScreen(
                 }
             }
 
-            // Space for Mini Player if needed
-            if (currentSong != null) {
-                Spacer(modifier = Modifier.height(60.dp))
-            }
+            // PERBAIKAN: Hapus manual spacing untuk mini player
+            // Gunakan contentPadding di LazyColumn sebagai gantinya
         }
 
         // Upload Song Dialog

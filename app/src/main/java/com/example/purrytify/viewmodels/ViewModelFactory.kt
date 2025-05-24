@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.example.purrytify.PurrytifyApp
 import com.example.purrytify.repository.AuthRepository
+import com.example.purrytify.repository.OnlineSongsRepository
+import com.example.purrytify.repository.RecommendationRepository
 import com.example.purrytify.repository.UserRepository
 import com.example.purrytify.util.TokenManager
 import java.lang.ref.WeakReference
@@ -30,6 +32,14 @@ class ViewModelFactory(appContext: Context) : ViewModelProvider.Factory {
         (contextRef.get() as? PurrytifyApp) ?: throw IllegalStateException("Context is not PurrytifyApp")
     }
 
+    private val onlineSongsRepository by lazy {
+        OnlineSongsRepository(app.database.songDao())
+    }
+
+    private val recommendationRepository by lazy {
+        RecommendationRepository(app.database.songDao(), onlineSongsRepository)
+    }
+
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return when {
@@ -50,6 +60,9 @@ class ViewModelFactory(appContext: Context) : ViewModelProvider.Factory {
             }
             modelClass.isAssignableFrom(MainViewModel::class.java) -> {
                 MainViewModel(app.songRepository) as T
+            }
+            modelClass.isAssignableFrom(RecommendationViewModel::class.java) -> {
+                RecommendationViewModel(recommendationRepository, tokenManager) as T
             }
             else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }
