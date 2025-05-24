@@ -1,3 +1,5 @@
+// Location: app/src/main/java/com/example/purrytify/ui/components/OnlineSongItem.kt
+
 package com.example.purrytify.ui.components
 
 import androidx.compose.foundation.background
@@ -5,9 +7,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -114,22 +118,37 @@ fun OnlineSongItem(
             )
         }
 
-        // Download button (if callback provided)
+        // Download button or status
         if (onDownloadClick != null) {
             IconButton(
-                onClick = { onDownloadClick(song) },
+                onClick = { if (!isDownloaded && !isDownloading) onDownloadClick(song) },
                 modifier = Modifier.size(48.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Download,
-                    contentDescription = "Download",
-                    tint = when {
-                        isDownloaded -> GREEN_COLOR
-                        isDownloading -> Color.Yellow
-                        else -> Color.White
-                    },
-                    modifier = Modifier.size(24.dp)
-                )
+                when {
+                    isDownloaded -> {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = "Downloaded",
+                            tint = GREEN_COLOR,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    isDownloading -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = Color.Yellow,
+                            strokeWidth = 2.dp
+                        )
+                    }
+                    else -> {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = "Download",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
             }
         }
     }

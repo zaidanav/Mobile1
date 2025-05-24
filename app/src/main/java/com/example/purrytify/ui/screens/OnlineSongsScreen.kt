@@ -1,5 +1,8 @@
+// Location: app/src/main/java/com/example/purrytify/ui/screens/OnlineSongsScreen.kt
+
 package com.example.purrytify.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,18 +27,25 @@ import com.example.purrytify.ui.components.OnlineSongItem
 import com.example.purrytify.ui.theme.BACKGROUND_COLOR
 import com.example.purrytify.ui.theme.GREEN_COLOR
 import com.example.purrytify.util.NetworkUtils
+import com.example.purrytify.util.SongDownloadManager
 import com.example.purrytify.viewmodels.OnlineSongsViewModel
 import com.example.purrytify.viewmodels.OnlineSongsViewModelFactory
+import kotlinx.coroutines.launch
+import com.example.purrytify.viewmodels.LibraryViewModel
+import com.example.purrytify.viewmodels.ViewModelFactory
 
 @Composable
 fun OnlineSongsScreen(
     onSongSelected: (OnlineSong) -> Unit,
-    onDownloadClick: ((OnlineSong) -> Unit)? = null,
     viewModel: OnlineSongsViewModel = viewModel(
         factory = OnlineSongsViewModelFactory(LocalContext.current)
     )
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    // Initialize download manager
+    val downloadManager = remember { SongDownloadManager(context) }
 
     // Check network connection
     val isNetworkAvailable = remember { mutableStateOf(NetworkUtils.isNetworkAvailable(context)) }
@@ -48,13 +58,60 @@ fun OnlineSongsScreen(
     val downloadedSongIds by viewModel.downloadedSongIds.observeAsState(emptySet())
     val downloadingSongs by viewModel.downloadingSongs.observeAsState(emptySet())
 
+    // Observe download states
+    val downloadStates by downloadManager.downloadStates.collectAsState()
+
     // Tab selection state
     var selectedTabIndex by remember { mutableStateOf(0) }
     val tabs = listOf("Global Top 50", "Country Top 10")
 
+    val libraryViewModel: LibraryViewModel = viewModel(
+        factory = ViewModelFactory.getInstance(LocalContext.current)
+    )
+
     // Load data on first composition
     LaunchedEffect(key1 = Unit) {
         viewModel.loadData()
+    }
+
+    // Handle download completion
+    LaunchedEffect(downloadStates) {
+        downloadStates.forEach { (songId, state) ->
+            when (state) {
+                is SongDownloadManager.DownloadState.Completed -> {
+                    // If we haven't processed this completion yet
+                    if (!downloadedSongIds.contains(songId)) {
+                        Log.d("OnlineSongsScreen", "Download completed for song $songId, saving to database")
+
+                        // Find the song in either global or country list
+                        val song = globalTopSongs.find { it.id == songId }
+                            ?: countryTopSongs.find { it.id == songId }
+
+                        // Save the downloaded song to the database
+                        song?.let {
+                            coroutineScope.launch {
+                                val result = viewModel.saveDownloadedSong(it, state.localFilePath)
+                                Log.d("OnlineSongsScreen", "Save result for song $songId: $result")
+                                if (result > 0) {
+                                    viewModel.markSongAsDownloaded(songId)
+                                    // Force refresh downloaded songs list
+                                    viewModel.loadDownloadedSongIds()
+                                    // Debug database content
+                                    libraryViewModel.debugDatabaseContent()
+                                }
+
+                            }
+                        }
+                    }
+                }
+                is SongDownloadManager.DownloadState.Failed -> {
+                    Log.e("OnlineSongsScreen", "Download failed for song $songId: ${state.reason}")
+                    // Remove from downloading state
+                    viewModel.removeFromDownloading(songId)
+                }
+                else -> {} // Downloading state is handled elsewhere
+            }
+        }
     }
 
     // Show no internet screen if not connected
@@ -115,8 +172,9 @@ fun OnlineSongsScreen(
                             }
 
                             itemsIndexed(globalTopSongs) { index, song ->
-                                val isDownloaded = viewModel.isSongDownloaded(song.id)
-                                val isDownloading = viewModel.isSongDownloading(song.id)
+                                val isDownloaded = downloadedSongIds.contains(song.id)
+                                val isDownloading = downloadingSongs.contains(song.id) ||
+                                        downloadStates[song.id] is SongDownloadManager.DownloadState.Downloading
 
                                 OnlineSongItem(
                                     song = song,
@@ -126,7 +184,21 @@ fun OnlineSongsScreen(
                                     showRank = true,
                                     rank = index + 1,
                                     onSongClick = onSongSelected,
-                                    onDownloadClick = onDownloadClick
+                                    onDownloadClick = { clickedSong ->
+                                        if (!isDownloaded && !isDownloading) {
+                                            // Start download
+                                            viewModel.markSongAsDownloading(clickedSong.id)
+                                            downloadManager.downloadSong(clickedSong)
+
+                                            // Update progress periodically
+                                            coroutineScope.launch {
+                                                while (downloadStates[clickedSong.id] is SongDownloadManager.DownloadState.Downloading) {
+                                                    downloadManager.checkDownloadProgress(clickedSong.id)
+                                                    kotlinx.coroutines.delay(500)
+                                                }
+                                            }
+                                        }
+                                    }
                                 )
                             }
                         }
@@ -161,8 +233,9 @@ fun OnlineSongsScreen(
                             }
 
                             itemsIndexed(countryTopSongs) { index, song ->
-                                val isDownloaded = viewModel.isSongDownloaded(song.id)
-                                val isDownloading = viewModel.isSongDownloading(song.id)
+                                val isDownloaded = downloadedSongIds.contains(song.id)
+                                val isDownloading = downloadingSongs.contains(song.id) ||
+                                        downloadStates[song.id] is SongDownloadManager.DownloadState.Downloading
 
                                 OnlineSongItem(
                                     song = song,
@@ -172,13 +245,34 @@ fun OnlineSongsScreen(
                                     showRank = true,
                                     rank = index + 1,
                                     onSongClick = onSongSelected,
-                                    onDownloadClick = onDownloadClick
+                                    onDownloadClick = { clickedSong ->
+                                        if (!isDownloaded && !isDownloading) {
+                                            // Start download
+                                            viewModel.markSongAsDownloading(clickedSong.id)
+                                            downloadManager.downloadSong(clickedSong)
+
+                                            // Update progress periodically
+                                            coroutineScope.launch {
+                                                while (downloadStates[clickedSong.id] is SongDownloadManager.DownloadState.Downloading) {
+                                                    downloadManager.checkDownloadProgress(clickedSong.id)
+                                                    kotlinx.coroutines.delay(500)
+                                                }
+                                            }
+                                        }
+                                    }
                                 )
                             }
                         }
                     }
                 }
             }
+        }
+    }
+
+    // Cleanup downloads when leaving the screen
+    DisposableEffect(Unit) {
+        onDispose {
+            downloadManager.release()
         }
     }
 }

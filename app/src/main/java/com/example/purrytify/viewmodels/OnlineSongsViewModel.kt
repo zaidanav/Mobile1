@@ -1,3 +1,5 @@
+// Location: app/src/main/java/com/example/purrytify/viewmodels/OnlineSongsViewModel.kt
+
 package com.example.purrytify.viewmodels
 
 import android.util.Log
@@ -119,22 +121,36 @@ class OnlineSongsViewModel(
         }
     }
 
-    private suspend fun loadDownloadedSongIds() {
-        try {
-            // We'll use an empty LiveData to get downloaded songs IDs
-            val downloadedSongs = onlineSongsRepository.getDownloadedOnlineSongs().value ?: emptyList()
-            val ids = downloadedSongs.mapNotNull { it.onlineId }.toSet()
-            _downloadedSongIds.value = ids
-        } catch (e: Exception) {
-            Log.e(TAG, "Error loading downloaded song IDs", e)
-        }
-    }
 
     // Mark song as downloading
     fun markSongAsDownloading(songId: Int) {
         val currentDownloading = _downloadingSongs.value?.toMutableSet() ?: mutableSetOf()
         currentDownloading.add(songId)
         _downloadingSongs.value = currentDownloading
+        Log.d(TAG, "Marked song $songId as downloading")
+    }
+
+    // Remove a song from downloading state
+    fun removeFromDownloading(songId: Int) {
+        val currentDownloading = _downloadingSongs.value?.toMutableSet() ?: mutableSetOf()
+        currentDownloading.remove(songId)
+        _downloadingSongs.value = currentDownloading
+        Log.d(TAG, "Removed song $songId from downloading state")
+    }
+
+    // Make this public so it can be called from the UI
+    fun loadDownloadedSongIds() {
+        viewModelScope.launch {
+            try {
+                // Use direct query instead of LiveData for immediate result
+                val downloadedSongs = onlineSongsRepository.getDownloadedOnlineSongsSync()
+                val ids = downloadedSongs.mapNotNull { it.onlineId }.toSet()
+                _downloadedSongIds.value = ids
+                Log.d(TAG, "Loaded ${ids.size} downloaded song IDs: $ids")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading downloaded song IDs", e)
+            }
+        }
     }
 
     // Mark song as downloaded
@@ -148,13 +164,18 @@ class OnlineSongsViewModel(
         val currentDownloaded = _downloadedSongIds.value?.toMutableSet() ?: mutableSetOf()
         currentDownloaded.add(songId)
         _downloadedSongIds.value = currentDownloaded
+
+        Log.d(TAG, "Marked song $songId as downloaded")
     }
 
     // Save downloaded song
     suspend fun saveDownloadedSong(onlineSong: OnlineSong, localFilePath: String): Long {
         return if (currentUserId > 0) {
-            onlineSongsRepository.saveDownloadedSong(onlineSong, localFilePath, currentUserId)
+            val result = onlineSongsRepository.saveDownloadedSong(onlineSong, localFilePath, currentUserId)
+            Log.d(TAG, "Saved downloaded song ${onlineSong.title} with ID: $result")
+            result
         } else {
+            Log.e(TAG, "Cannot save downloaded song: User ID is not set")
             -1L
         }
     }

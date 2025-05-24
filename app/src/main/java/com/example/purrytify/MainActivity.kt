@@ -70,6 +70,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var localBroadcastManager: LocalBroadcastManager
     private lateinit var downloadManager: SongDownloadManager
 
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 

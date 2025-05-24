@@ -1,6 +1,9 @@
+// Location: app/src/main/java/com/example/purrytify/repository/OnlineSongsRepository.kt
+
 package com.example.purrytify.repository
 
 import android.util.Log
+import androidx.lifecycle.LiveData
 import com.example.purrytify.data.dao.SongDao
 import com.example.purrytify.data.entity.Song
 import com.example.purrytify.models.OnlineSong
@@ -46,23 +49,34 @@ class OnlineSongsRepository(private val songDao: SongDao) {
         }
     }
 
-    // Save downloaded song
+    // Save downloaded song to database
     suspend fun saveDownloadedSong(onlineSong: OnlineSong, localFilePath: String, userId: Int): Long {
         return withContext(Dispatchers.IO) {
             try {
+                // Check if the song is already downloaded
+                val existingSong = songDao.getDownloadedSongByOnlineId(onlineId = onlineSong.id, userId = userId)
+                if (existingSong != null) {
+                    Log.d(TAG, "Song already exists in database, skipping insertion: ${onlineSong.title}")
+                    return@withContext existingSong.id
+                }
+
                 val song = Song(
                     title = onlineSong.title,
                     artist = onlineSong.artist,
-                    filePath = localFilePath,
-                    artworkPath = onlineSong.artworkUrl,
+                    filePath = localFilePath, // Local path to the downloaded file
+                    artworkPath = onlineSong.artworkUrl, // We'll use the online artwork URL
                     duration = onlineSong.getDurationInMillis(),
+                    isLiked = false,
+                    lastPlayed = null,
                     addedAt = System.currentTimeMillis(),
                     userId = userId,
-                    isOnline = true,
-                    onlineId = onlineSong.id
+                    isOnline = true, // Mark as online song
+                    onlineId = onlineSong.id // Save reference to the online ID
                 )
 
-                songDao.insertSong(song)
+                val id = songDao.insertSong(song)
+                Log.d(TAG, "Song saved to database: ${onlineSong.title}, ID: $id")
+                id
             } catch (e: Exception) {
                 Log.e(TAG, "Error saving downloaded song", e)
                 -1L
@@ -70,12 +84,22 @@ class OnlineSongsRepository(private val songDao: SongDao) {
         }
     }
 
-    // Check if song is already downloaded
-    suspend fun isSongDownloaded(onlineId: Int): Boolean {
+    suspend fun getDownloadedOnlineSongsSync(): List<Song> {
         return withContext(Dispatchers.IO) {
             try {
-                val count = songDao.getCountByOnlineId(onlineId)
-                count > 0
+                songDao.getDownloadedOnlineSongsSync()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error getting downloaded songs synchronously", e)
+                emptyList()
+            }
+        }
+    }
+    // Check if song is already downloaded
+    suspend fun isSongDownloaded(onlineId: Int, userId: Int): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val song = songDao.getDownloadedSongByOnlineId(onlineId, userId)
+                song != null
             } catch (e: Exception) {
                 Log.e(TAG, "Error checking if song is downloaded", e)
                 false
@@ -86,11 +110,11 @@ class OnlineSongsRepository(private val songDao: SongDao) {
     // Get downloaded online songs
     fun getDownloadedOnlineSongs() = songDao.getDownloadedOnlineSongs()
 
-    // Get song by online ID
-    suspend fun getSongByOnlineId(onlineId: Int): Song? {
+    // Get downloaded song by online ID
+    suspend fun getSongByOnlineId(onlineId: Int, userId: Int): Song? {
         return withContext(Dispatchers.IO) {
             try {
-                songDao.getSongByOnlineId(onlineId)
+                songDao.getDownloadedSongByOnlineId(onlineId, userId)
             } catch (e: Exception) {
                 Log.e(TAG, "Error getting song by online ID", e)
                 null

@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.purrytify.data.entity.Song as EntitySong
 import com.example.purrytify.data.repository.SongRepository
 import com.example.purrytify.models.Song
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,6 +36,7 @@ class LibraryViewModel(private val repository: SongRepository) : ViewModel() {
     init {
         viewModelScope.launch {
             repository.allSongs.asFlow().collect { dbSongs ->
+                Log.d(TAG, "Collected ${dbSongs.size} songs from repository")
                 _songs.value = dbSongs.map { dbSong ->
                     Song(
                         id = dbSong.id,
@@ -44,7 +46,9 @@ class LibraryViewModel(private val repository: SongRepository) : ViewModel() {
                         filePath = dbSong.filePath,
                         duration = dbSong.duration,
                         isLiked = dbSong.isLiked,
-                        isPlaying = false
+                        isPlaying = false,
+                        isOnline = dbSong.isOnline,
+                        onlineId = dbSong.onlineId
                     )
                 }
             }
@@ -64,6 +68,24 @@ class LibraryViewModel(private val repository: SongRepository) : ViewModel() {
     fun toggleLike(song: Song) {
         viewModelScope.launch {
             repository.toggleLike(song.id, !song.isLiked)
+        }
+    }
+    fun debugDatabaseContent() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val totalCount = repository.getTotalSongCount()
+                val onlineCount = repository.getOnlineSongCount()
+                Log.d(TAG, "DEBUG: Database contains $totalCount total songs, $onlineCount online songs")
+
+                // Get all songs and log their details
+                val allSongs = repository.getAllSongsSync()
+                Log.d(TAG, "DEBUG: All songs in database (${allSongs.size}):")
+                allSongs.forEach { song ->
+                    Log.d(TAG, "DEBUG: Song[id=${song.id}, title=${song.title}, isOnline=${song.isOnline}, onlineId=${song.onlineId}]")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error debugging database content", e)
+            }
         }
     }
 

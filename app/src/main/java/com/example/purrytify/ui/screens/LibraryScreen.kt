@@ -104,6 +104,8 @@ fun LibraryScreen(
 
     // Filter songs based on search query
     val filteredSongs = remember(songs, searchQuery, selectedTab) {
+        // This should already be handling both local and online songs since the SongRepository
+        // is fetching both types. Just make sure the UI can display and filter them properly.
         val filteredByTab = if (selectedTab == "All") songs else songs.filter { it.isLiked }
 
         if (searchQuery.isBlank()) {

@@ -1,3 +1,5 @@
+// Location: app/src/main/java/com/example/purrytify/util/SongDownloadManager.kt
+
 package com.example.purrytify.util
 
 import android.app.DownloadManager
@@ -59,12 +61,12 @@ class SongDownloadManager(private val context: Context) {
         // Register broadcast receiver for download completion
         val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
 
-        // Menggunakan flag yang sesuai berdasarkan versi Android
+        // Using the appropriate flag based on Android version
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            // Android 12 (API level 31) atau lebih baru memerlukan flag
+            // Android 12 (API level 31) or newer requires a flag
             context.registerReceiver(downloadCompleteReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {
-            // Versi Android yang lebih lama
+            // Older Android versions
             context.registerReceiver(downloadCompleteReceiver, filter)
         }
     }
@@ -72,6 +74,7 @@ class SongDownloadManager(private val context: Context) {
     // Handle download completion
     private fun handleDownloadComplete(downloadId: Long) {
         val songId = downloadIds[downloadId] ?: return
+        Log.d(TAG, "Handling completion for download ID: $downloadId, song ID: $songId")
 
         // Query download status
         val query = DownloadManager.Query().setFilterById(downloadId)
@@ -94,6 +97,7 @@ class SongDownloadManager(private val context: Context) {
                     if (filePath != null) {
                         // Update state
                         updateDownloadState(songId, DownloadState.Completed(songId, filePath))
+                        Log.d(TAG, "Download completed for song $songId: $filePath")
                     } else {
                         // Failed to get file path
                         handleDownloadFailure(songId, "Failed to get file path")
@@ -136,6 +140,7 @@ class SongDownloadManager(private val context: Context) {
 
     // Handle download failure
     private fun handleDownloadFailure(songId: Int, reason: String) {
+        Log.e(TAG, "Download failed for song $songId: $reason")
         // Update state
         updateDownloadState(songId, DownloadState.Failed(songId, reason))
     }
@@ -162,6 +167,9 @@ class SongDownloadManager(private val context: Context) {
         _downloadStates.value = currentStates
     }
 
+    // Location: app/src/main/java/com/example/purrytify/util/SongDownloadManager.kt
+// (Continuing the previous code)
+
     // Download a song
     fun downloadSong(song: OnlineSong): Long {
         // Check if song is already downloading
@@ -175,8 +183,11 @@ class SongDownloadManager(private val context: Context) {
             downloadDir.mkdirs()
         }
 
-        // Create file name from song details
-        val fileName = "${song.id}_${song.title.replace(" ", "_")}.mp3"
+        // Create file name from song details (sanitize the title to avoid invalid chars)
+        val sanitizedTitle = song.title.replace("[^a-zA-Z0-9._-]".toRegex(), "_")
+        val fileName = "${song.id}_${sanitizedTitle}.mp3"
+
+        Log.d(TAG, "Starting download for song ${song.title} (ID: ${song.id}), URL: ${song.audioUrl}")
 
         // Create download request
         val request = DownloadManager.Request(Uri.parse(song.audioUrl))
@@ -197,6 +208,7 @@ class SongDownloadManager(private val context: Context) {
         // Update state
         updateDownloadState(song.id, DownloadState.Downloading(song.id, 0))
 
+        Log.d(TAG, "Download started for song ${song.id} with download ID: $downloadId")
         return downloadId
     }
 
@@ -229,6 +241,19 @@ class SongDownloadManager(private val context: Context) {
                     // Update state
                     updateDownloadState(songId, DownloadState.Downloading(songId, progress))
                 }
+                DownloadManager.STATUS_SUCCESSFUL -> {
+                    // Call handleDownloadComplete to process the completed download
+                    handleDownloadComplete(downloadId)
+                }
+                DownloadManager.STATUS_FAILED -> {
+                    // Get reason
+                    val reasonColumnIndex = cursor.getColumnIndex(DownloadManager.COLUMN_REASON)
+                    val reason = cursor.getInt(reasonColumnIndex)
+                    val reasonText = getDownloadErrorReason(reason)
+
+                    // Handle failure
+                    handleDownloadFailure(songId, reasonText)
+                }
             }
         }
 
@@ -252,6 +277,7 @@ class SongDownloadManager(private val context: Context) {
             currentStates.remove(songId)
             _downloadStates.value = currentStates
 
+            Log.d(TAG, "Download canceled for song $songId")
             return true
         }
 
@@ -262,6 +288,7 @@ class SongDownloadManager(private val context: Context) {
     fun release() {
         try {
             context.unregisterReceiver(downloadCompleteReceiver)
+            Log.d(TAG, "Unregistered download complete receiver")
         } catch (e: Exception) {
             Log.e(TAG, "Error unregistering receiver: ${e.message}")
         }
@@ -282,3 +309,5 @@ class SongDownloadManager(private val context: Context) {
         }
     }
 }
+
+// Start audio downloa
