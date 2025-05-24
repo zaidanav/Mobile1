@@ -12,6 +12,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.LibraryMusic
+import androidx.compose.material.icons.outlined.List
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Icon
@@ -59,12 +61,26 @@ fun BottomNavbar(navController: NavController) {
         )
 
         NavBarItem(
-            icon = Icons.Outlined.Email ,
+            icon = Icons.Outlined.LibraryMusic ,
             label = "Your Library",
             isSelected = currentRoute == Destinations.LIBRARY_ROUTE,
             onClick = {
                 if (currentRoute != Destinations.LIBRARY_ROUTE) {
                     navController.navigate(Destinations.LIBRARY_ROUTE) {
+                        popUpTo(navController.graph.startDestinationId)
+                        launchSingleTop = true
+                    }
+                }
+            }
+        )
+
+        NavBarItem(
+            icon = Icons.Outlined.MusicNote, // Use appropriate icon
+            label = "Online",
+            isSelected = currentRoute == Destinations.ONLINE_SONGS_ROUTE,
+            onClick = {
+                if (currentRoute != Destinations.ONLINE_SONGS_ROUTE) {
+                    navController.navigate(Destinations.ONLINE_SONGS_ROUTE) {
                         popUpTo(navController.graph.startDestinationId)
                         launchSingleTop = true
                     }
@@ -86,20 +102,7 @@ fun BottomNavbar(navController: NavController) {
             }
         )
 
-        // Add this NavBarItem to the BottomNavbar:
-        NavBarItem(
-            icon = Icons.Outlined.CloudDownload, // Use appropriate icon
-            label = "Online",
-            isSelected = currentRoute == Destinations.ONLINE_SONGS_ROUTE,
-            onClick = {
-                if (currentRoute != Destinations.ONLINE_SONGS_ROUTE) {
-                    navController.navigate(Destinations.ONLINE_SONGS_ROUTE) {
-                        popUpTo(navController.graph.startDestinationId)
-                        launchSingleTop = true
-                    }
-                }
-            }
-        )
+
     }
 }
 
