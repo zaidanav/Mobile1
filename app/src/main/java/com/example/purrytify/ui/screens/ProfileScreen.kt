@@ -1,13 +1,16 @@
 package com.example.purrytify.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Speaker
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.purrytify.MainActivity
@@ -35,9 +39,9 @@ import com.example.purrytify.viewmodels.ViewModelFactory
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
+    navController: NavController,
     profileViewModel: ProfileViewModel = viewModel(
         factory = ViewModelFactory.getInstance(LocalContext.current)
     )
@@ -107,7 +111,7 @@ fun ProfileScreen(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header with refresh button
+            // Header with refresh and edit buttons
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -122,12 +126,26 @@ fun ProfileScreen(
                     fontSize = 24.sp
                 )
 
-                IconButton(onClick = { profileViewModel.refreshData() }) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Refresh Profile",
-                        tint = Color.White
-                    )
+                Row {
+                    // Edit Profile Button
+                    IconButton(onClick = {
+                        navController.navigate("edit_profile")
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit Profile",
+                            tint = GREEN_COLOR
+                        )
+                    }
+
+                    // Refresh Button
+                    IconButton(onClick = { profileViewModel.refreshData() }) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh Profile",
+                            tint = Color.White
+                        )
+                    }
                 }
             }
 
@@ -149,7 +167,8 @@ fun ProfileScreen(
                     listenedSongs = listenedSongs,
                     onLogout = {
                         (context as? MainActivity)?.logout()
-                    }
+                    },
+                    navController = navController
                 )
             }
         }
@@ -198,9 +217,10 @@ fun ProfileContent(
     totalSongs: Int,
     likedSongs: Int,
     listenedSongs: Int,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    navController: NavController
 ) {
-    val context = LocalContext.current
+    LocalContext.current
 
     Column(
         modifier = Modifier
@@ -304,6 +324,41 @@ fun ProfileContent(
                 }
             }
         }
+
+        // Spacer to push buttons down
+        Spacer(modifier = Modifier.height(48.dp))
+
+        // Audio Output Device Setting
+        ListItem(
+            headlineContent = {
+                Text(
+                    "Audio Output Device",
+//                    color = Color.White
+                )
+            },
+            supportingContent = {
+                Text(
+                    "Select audio output device",
+//                    color = Color.White.copy(alpha = 0.7f)
+                )
+            },
+            leadingContent = {
+                Icon(
+                    Icons.Default.Speaker,
+                    contentDescription = null,
+//                    tint = Color.White
+                )
+            },
+            modifier = Modifier
+                .clickable {
+                    navController.navigate("audio_devices")
+                }
+                .background(
+                    BACKGROUND_COLOR,
+                    RoundedCornerShape(8.dp)
+                )
+                .padding(4.dp)
+        )
 
         // Spacer to push the logout button to the bottom
         Spacer(modifier = Modifier.height(48.dp))

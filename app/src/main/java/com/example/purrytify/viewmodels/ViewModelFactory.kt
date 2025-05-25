@@ -49,6 +49,12 @@ class ViewModelFactory(appContext: Context) : ViewModelProvider.Factory {
             modelClass.isAssignableFrom(ProfileViewModel::class.java) -> {
                 ProfileViewModel(authRepository, userRepository, app.songRepository) as T
             }
+            modelClass.isAssignableFrom(EditProfileViewModel::class.java) -> {
+                EditProfileViewModel(
+                    contextRef.get() as android.app.Application,
+                    userRepository
+                ) as T
+            }
             modelClass.isAssignableFrom(SongViewModel::class.java) -> {
                 SongViewModel(app.songRepository) as T
             }
@@ -63,6 +69,9 @@ class ViewModelFactory(appContext: Context) : ViewModelProvider.Factory {
             }
             modelClass.isAssignableFrom(RecommendationViewModel::class.java) -> {
                 RecommendationViewModel(recommendationRepository, tokenManager) as T
+            }
+            modelClass.isAssignableFrom(AudioDeviceViewModel::class.java) -> {
+                AudioDeviceViewModel(contextRef.get() as android.app.Application) as T
             }
             else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }
