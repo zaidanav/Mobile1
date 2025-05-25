@@ -74,7 +74,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var localBroadcastManager: LocalBroadcastManager
     private lateinit var downloadManager: SongDownloadManager
 
-    // TAMBAHAN: Media Button Action Receiver
     private lateinit var mediaButtonActionReceiver: BroadcastReceiver
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -314,7 +313,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Initialize broadcast receivers - FIXED FOR ANDROID 14+
             withContext(Dispatchers.Main) {
                 try {
                     songCompletionReceiver = SongCompletionReceiver(mainViewModel)
@@ -445,7 +443,6 @@ class MainActivity : ComponentActivity() {
             Log.e(TAG, "Error unregistering song completion receiver: ${e.message}")
         }
 
-        // TAMBAHAN: Unregister media button action receiver
         try {
             localBroadcastManager.unregisterReceiver(mediaButtonActionReceiver)
         } catch (e: Exception) {

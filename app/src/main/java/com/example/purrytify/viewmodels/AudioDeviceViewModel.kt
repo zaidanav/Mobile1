@@ -6,14 +6,13 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.purrytify.models.AudioDevice
 import com.example.purrytify.util.AudioDeviceManager
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-/**
- * ViewModel untuk mengelola state audio devices
- */
+
 class AudioDeviceViewModel(application: Application) : AndroidViewModel(application) {
     private val TAG = "AudioDeviceViewModel"
 
@@ -44,10 +43,7 @@ class AudioDeviceViewModel(application: Application) : AndroidViewModel(applicat
         collectAudioDevices()
     }
 
-    /**
-     * Collect audio devices dari manager
-     * Akan terus listening untuk perubahan devices
-     */
+
     private fun collectAudioDevices() {
         viewModelScope.launch {
             audioDeviceManager.audioDevices.collect { devices ->
@@ -60,22 +56,23 @@ class AudioDeviceViewModel(application: Application) : AndroidViewModel(applicat
                 _audioDevices.value = devices
 
                 // Update active device
-                _activeDevice.value = devices.firstOrNull { it.isActive }
-                if (_activeDevice.value != null) {
-                    Log.d(TAG, "Active device updated: Name: ${_activeDevice.value?.name}, Type: ${_activeDevice.value?.type}")
-                } else {
-                    Log.d(TAG, "No active device found in the new list.")
+                val newActiveDevice = devices.firstOrNull { it.isActive }
+                if (newActiveDevice != _activeDevice.value) {
+                    _activeDevice.value = newActiveDevice
+                    if (newActiveDevice != null) {
+                        Log.d(TAG, "Active device updated: Name: ${newActiveDevice.name}, Type: ${newActiveDevice.type}")
+                    } else {
+                        Log.d(TAG, "No active device found in the new list.")
+                    }
                 }
+
                 // Check for disconnection of previously active device
                 checkForDisconnection(devices)
             }
         }
     }
 
-    /**
-     * Check apakah ada device yang disconnect
-     * Jika active device disconnect, show error dan fallback
-     */
+
     private fun checkForDisconnection(currentDevices: List<AudioDevice>) {
         val activeDevice = _activeDevice.value ?: return
 
@@ -102,13 +99,9 @@ class AudioDeviceViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    /**
-     * Switch ke device tertentu
-     *
-     * @param device Device yang akan diaktifkan
-     */
+
     fun switchToDevice(device: AudioDevice) {
-        Log.d(TAG, "User requested switch to: ${device.name}")
+        Log.d(TAG, "User requested switch to: ${device.name} (${device.type})")
 
         viewModelScope.launch {
             _isLoading.value = true
@@ -119,9 +112,11 @@ class AudioDeviceViewModel(application: Application) : AndroidViewModel(applicat
                 when (device.connectionState) {
                     com.example.purrytify.models.ConnectionState.DISCONNECTED,
                     com.example.purrytify.models.ConnectionState.AVAILABLE -> {
-                        _errorMessage.value = "Cannot switch to ${device.name}. Device is not connected."
-                        _isLoading.value = false
-                        return@launch
+                        if (device.type != com.example.purrytify.models.AudioDeviceType.BLUETOOTH_A2DP) {
+                            _errorMessage.value = "Cannot switch to ${device.name}. Device is not connected."
+                            _isLoading.value = false
+                            return@launch
+                        }
                     }
 
                     com.example.purrytify.models.ConnectionState.CONNECTING -> {
@@ -135,27 +130,66 @@ class AudioDeviceViewModel(application: Application) : AndroidViewModel(applicat
                     }
                 }
 
-                // Attempt to switch
-                val success = audioDeviceManager.switchToDevice(device)
+
+                var success = false
+                var attempts = 0
+                val maxAttempts = 3
+
+                while (!success && attempts < maxAttempts) {
+                    attempts++
+                    Log.d(TAG, "Switch attempt $attempts/$maxAttempts")
+
+                    // Attempt to switch
+                    success = audioDeviceManager.switchToDevice(device)
+
+                    if (!success && attempts < maxAttempts) {
+                        Log.w(TAG, "Switch attempt $attempts failed, retrying...")
+                        delay(300) // Wait before retry
+
+                        // Force refresh audio routing on retry
+                        if (attempts == 2) {
+                            audioDeviceManager.forceRefreshAudioRouting()
+                            delay(200)
+                        }
+                    }
+                }
 
                 if (success) {
                     _successMessage.value = "Switched to ${device.name}"
+                    Log.d(TAG, "Successfully switched to ${device.name}")
+
+                    // Wait a bit for the change to propagate
+                    delay(500)
+
+                    // Force update active device immediately
+                    val updatedDevices = _audioDevices.value.map {
+                        it.copy(isActive = it.id == device.id)
+                    }
+                    _audioDevices.value = updatedDevices
+                    _activeDevice.value = device.copy(isActive = true)
 
                     // Clear success message after 2 seconds
                     viewModelScope.launch {
-                        kotlinx.coroutines.delay(2000)
+                        delay(2000)
                         _successMessage.value = null
                     }
 
-                    // Force update active device
-                    _activeDevice.value = device.copy(isActive = true)
+                    // Notify MediaPlayerService about the device switch
+                    notifyMediaServiceOfDeviceSwitch(device)
 
-                    // Update devices list
-                    _audioDevices.value = _audioDevices.value.map {
-                        it.copy(isActive = it.id == device.id)
-                    }
                 } else {
-                    _errorMessage.value = "Failed to switch to ${device.name}"
+                    val errorMsg = "Failed to switch to ${device.name}. Please try again."
+                    _errorMessage.value = errorMsg
+                    Log.e(TAG, errorMsg)
+
+                    // If switching to speaker failed, try to force it
+                    if (device.type == com.example.purrytify.models.AudioDeviceType.INTERNAL_SPEAKER) {
+                        Log.d(TAG, "Attempting to force switch to speaker")
+                        viewModelScope.launch {
+                            delay(500)
+                            forceSwithToSpeaker()
+                        }
+                    }
                 }
 
             } catch (e: Exception) {
@@ -167,31 +201,124 @@ class AudioDeviceViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    /**
-     * Clear error message
-     */
+
+    private suspend fun forceSwithToSpeaker() {
+        try {
+            Log.d(TAG, "Force switching to speaker")
+
+            // Clear all audio routing first
+            audioDeviceManager.clearAudioRouting()
+            delay(200)
+
+            // Try switching again
+            val success = audioDeviceManager.switchToDevice(
+                com.example.purrytify.models.AudioDevice(
+                    id = "internal_speaker",
+                    name = "Phone Speaker",
+                    type = com.example.purrytify.models.AudioDeviceType.INTERNAL_SPEAKER,
+                    connectionState = com.example.purrytify.models.ConnectionState.CONNECTED,
+                    isActive = false
+                )
+            )
+
+            if (success) {
+                _successMessage.value = "Switched to Phone Speaker"
+                _errorMessage.value = null
+
+                // Update UI
+                val updatedDevices = _audioDevices.value.map {
+                    it.copy(isActive = it.type == com.example.purrytify.models.AudioDeviceType.INTERNAL_SPEAKER)
+                }
+                _audioDevices.value = updatedDevices
+                _activeDevice.value = updatedDevices.find { it.isActive }
+
+            } else {
+                Log.e(TAG, "Force switch to speaker also failed")
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in force switch to speaker: ${e.message}")
+        }
+    }
+
+
+    private fun notifyMediaServiceOfDeviceSwitch(device: AudioDevice) {
+        try {
+            val context = getApplication<Application>()
+            val intent = android.content.Intent("com.example.purrytify.AUDIO_DEVICE_SWITCHED")
+            intent.putExtra("device_type", device.type.name)
+            intent.putExtra("device_name", device.name)
+
+            androidx.localbroadcastmanager.content.LocalBroadcastManager
+                .getInstance(context)
+                .sendBroadcast(intent)
+
+            Log.d(TAG, "Sent device switch notification to MediaPlayerService")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error notifying MediaPlayerService: ${e.message}")
+        }
+    }
+
+
     fun clearError() {
         _errorMessage.value = null
     }
 
-    /**
-     * Clear success message
-     */
+
     fun clearSuccess() {
         _successMessage.value = null
     }
 
-    /**
-     * Refresh devices list
-     * Useful jika user ingin manual refresh
-     */
+
     fun refreshDevices() {
         Log.d(TAG, "Refreshing devices...")
-        // The Flow akan otomatis update, tapi kita bisa trigger UI feedback
         viewModelScope.launch {
             _isLoading.value = true
-            kotlinx.coroutines.delay(500) // Small delay for UI feedback
-            _isLoading.value = false
+
+            try {
+                // Force refresh audio routing
+                audioDeviceManager.forceRefreshAudioRouting()
+                delay(500) // Wait for changes to propagate
+
+                // Devices will be automatically updated via Flow
+                Log.d(TAG, "Device refresh completed")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error refreshing devices: ${e.message}")
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+
+    fun emergencyFallbackToSpeaker() {
+        Log.d(TAG, "Emergency fallback to speaker requested")
+
+        viewModelScope.launch {
+            try {
+                audioDeviceManager.clearAudioRouting()
+                delay(200)
+
+                val speakerDevice = _audioDevices.value.find {
+                    it.type == com.example.purrytify.models.AudioDeviceType.INTERNAL_SPEAKER
+                }
+
+                speakerDevice?.let { device ->
+                    switchToDevice(device)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in emergency fallback: ${e.message}")
+            }
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        // Clean up any audio routing when ViewModel is destroyed
+        try {
+            audioDeviceManager.clearAudioRouting()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error clearing audio routing on cleanup: ${e.message}")
         }
     }
 }
